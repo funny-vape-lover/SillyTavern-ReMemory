@@ -293,7 +293,7 @@ async function generateSceneSummary(mes_id) {
 	// slice to messages since the last scene end, if there was one
 	let last_end = chat.slice(0, mes_id+1).findLastIndex((it) => it.extra.rmr_scene);
 	if (last_end < 0) { last_end = 0; }
-	const memory_history = await processMessageSlice(mes_id, 0, last_end);
+	const memory_history = await processMessageSlice(mes_id, 0, last_end+1);
 
 	const max_tokens = getContext().maxContext - 100; // take out padding for the instructions
 	const getTokenCount = getContext().getTokenCountAsync;
