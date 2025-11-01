@@ -70,6 +70,12 @@ export function loadSlashCommands() {
 				isRequired: false,
 			}),
 			namedArg.fromProps({
+				name: 'span',
+				description: 'override the "memory span" setting',
+				typeList: [arg_types.NUMBER],
+				isRequired: false,
+			}),
+			namedArg.fromProps({
 				name: 'profile',
 				description: 'name of a connection profile to override the current one',
 				enumProvider: profilesProvider,

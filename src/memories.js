@@ -258,10 +258,11 @@ async function genSummary(history, id=0) {
 	return parsed_result.content;
 }
 
-async function generateMemory(message) {
+async function generateMemory(message, span=0) {
 	const mes_id = Number(message.attr('mesid'));
+	let memory_span = span > 0 ? span : settings.memory_span
 
-	const memory_history = await processMessageSlice(mes_id, settings.memory_span);
+	const memory_history = await processMessageSlice(mes_id, memory_span);
 	debug('memory history', memory_history);
 	const memory_context = memory_history.map((it) => `${it.name}: ${it.mes}`).join("\n\n");
 	return await genSummary(memory_context);
@@ -377,7 +378,9 @@ export async function rememberEvent(message, options={}) {
 		return;
 	}
 	infoToast('Generating memory....');
-	const message_text = await generateMemory(message);
+	let message_text;
+	if ('span' in options) message_text = await generateMemory(message, options.span);
+	else message_text = await generateMemory(message);
 	if (message_text.length <= 0) {
 		errorToast("No memory text to record.");
 		return;
