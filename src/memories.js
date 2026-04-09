@@ -211,11 +211,66 @@ async function swapProfile() {
 	return swapped;
 }
 
+async function waitForPresetChange() {
+	await new Promise((resolve) => {
+		getContext().eventSource.once(getContext().event_types.PRESET_CHANGED, resolve);
+	});
+}
+
+async function swapPreset() {
+	const context = getContext();
+	const presetManager = typeof context.getPresetManager === 'function' ? context.getPresetManager() : null;
+	let target_name = settings.preset;
+	if (commandArgs.preset) target_name = commandArgs.preset;
+	if (!target_name) {
+		return false;
+	}
+	if (!presetManager) {
+		oopsToast('Preset override is unavailable in this SillyTavern build; using the current preset.');
+		return false;
+	}
+
+	const current = presetManager.getSelectedPresetName();
+	if (current === target_name) {
+		return false;
+	}
+
+	const target_value = presetManager.findPreset(target_name);
+	if (target_value === undefined || target_value === null || target_value === '') {
+		oopsToast(`Preset "${target_name}" was not found for the current API; using the current preset.`);
+		return false;
+	}
+
+	debug('swapping preset', current, '->', target_name);
+	presetManager.selectPreset(target_value);
+	await waitForPresetChange();
+	return current;
+}
+
+async function restorePreset(previous_name) {
+	if (!previous_name) {
+		return;
+	}
+	const context = getContext();
+	const presetManager = typeof context.getPresetManager === 'function' ? context.getPresetManager() : null;
+	if (!presetManager) {
+		return;
+	}
+	const restore_value = presetManager.findPreset(previous_name);
+	if (restore_value === undefined || restore_value === null || restore_value === '') {
+		oopsToast(`Could not restore preset "${previous_name}" automatically.`);
+		return;
+	}
+	presetManager.selectPreset(restore_value);
+	await waitForPresetChange();
+}
+
 async function runSwappableGen(prompt, stops=[]) {
 	const context = getContext();
 	let result = '';
 	let swapped = false;
-	const shouldUsePresetAwareGeneration = settings.use_quiet_preset_generation || Boolean(settings.profile || commandArgs.profile);
+	let swapped_preset = false;
+	const shouldUsePresetAwareGeneration = settings.use_quiet_preset_generation || Boolean(settings.profile || commandArgs.profile || settings.preset || commandArgs.preset);
 	try {
 		context.deactivateSendButtons();
 		if (settings.profile || commandArgs.profile) {
@@ -223,11 +278,15 @@ async function runSwappableGen(prompt, stops=[]) {
 			debug('swapped?', swapped);
 			if (swapped === null) return '';
 		}
+		if (settings.preset || commandArgs.preset) {
+			swapped_preset = await swapPreset();
+			debug('swapped preset?', swapped_preset);
+		}
 
 		stops.forEach(addEphemeralStoppingString);
 		if (shouldUsePresetAwareGeneration && typeof context.generateQuietPrompt === 'function') {
 			debug('running preset-aware quiet generation');
-			result = await context.generateQuietPrompt(prompt, false, false);
+			result = await context.generateQuietPrompt({ quietPrompt: prompt });
 		}
 		else {
 			if (shouldUsePresetAwareGeneration) {
@@ -240,6 +299,9 @@ async function runSwappableGen(prompt, stops=[]) {
 		errorToast(err.message);
 	} finally {
 		flushEphemeralStoppingStrings();
+		if (swapped_preset) {
+			await restorePreset(swapped_preset);
+		}
 		if (swapped) {
 			$('#connection_profiles').val(swapped);
 			document.getElementById('connection_profiles').dispatchEvent(new Event('change'));

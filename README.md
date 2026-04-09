@@ -79,6 +79,7 @@ Configure which buttons you want visible on your messages.
 ![image](https://github.com/user-attachments/assets/4495c680-a350-4abc-8e62-f6cbd68e6909)
 
 - **Profile override** - Select a connection profile to be used when generating memories and keywords. Uses your current API settings by default.
+- **Preset override** - Select a SillyTavern API settings preset to temporarily use while generating memories and keywords. This is useful if your jailbreak or prompt stack lives in a preset.
 - **Use preset-aware quiet generation** - Sends ReMemory generations through SillyTavern's normal quiet prompt pipeline instead of raw generation. Enable this if your jailbreak, prompt manager setup, or API preset needs to apply to memory generation.
 - **Rate Limiting** - Configure a maximum number of requests the extension can make **per minute**, to avoid API throttling. Requests are evenly spaced based on this value. Set to 0 (default) for no rate limiting.
 - **Summary prompt** - The summary prompt is appended to the end of a chunk of messages or summaries when creating a summary. It's used by Generate Memory and by both stages of scene summaries.
@@ -111,6 +112,7 @@ Optional named arguments:
 - `title` - the title/memo for the memory entry
 - `popup` - optional override of the "Pop-Up Memory" setting
 - `profile` - optional connection profile override
+- `preset` - optional API settings preset override
     
 ### `/memory-log {id}`
 
@@ -135,6 +137,7 @@ Optional named arguments:
 - `title` - the title/memo for the memory entry
 - `popup` - optional override of the "Pop-Up Memory" setting
 - `profile` - optional connection profile override
+- `preset` - optional API settings preset override
   
 
 ## Support

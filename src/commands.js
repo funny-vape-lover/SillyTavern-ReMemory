@@ -10,6 +10,19 @@ const profilesProvider = () => [
 	...extension_settings.connectionManager.profiles.map(p => new SlashCommandEnumValue(p.name, null, enumTypes.name)),
 ];
 
+const presetsProvider = () => {
+	const presetManager = typeof getContext().getPresetManager === 'function' ? getContext().getPresetManager() : null;
+	if (!presetManager || typeof presetManager.getPresetList !== 'function') {
+		return [new SlashCommandEnumValue('<None>')];
+	}
+	const { preset_names } = presetManager.getPresetList();
+	const names = Array.isArray(preset_names) ? preset_names : Object.keys(preset_names ?? {});
+	return [
+		new SlashCommandEnumValue('<None>'),
+		...names.map(name => new SlashCommandEnumValue(name, null, enumTypes.name)),
+	];
+};
+
 function getMesFromInput(value) {
 	if (value.length > 0) {
 		const mes_id = Number(value);
@@ -79,6 +92,12 @@ export function loadSlashCommands() {
 				name: 'profile',
 				description: 'name of a connection profile to override the current one',
 				enumProvider: profilesProvider,
+				isRequired: false,
+			}),
+			namedArg.fromProps({
+				name: 'preset',
+				description: 'name of an API settings preset to override the current one',
+				enumProvider: presetsProvider,
 				isRequired: false,
 			}),
 		],
@@ -165,6 +184,12 @@ export function loadSlashCommands() {
 				name: 'profile',
 				description: 'name of a connection profile to override the current one',
 				enumProvider: profilesProvider,
+				isRequired: false,
+			}),
+			namedArg.fromProps({
+				name: 'preset',
+				description: 'name of an API settings preset to override the current one',
+				enumProvider: presetsProvider,
 				isRequired: false,
 			}),
 		],

@@ -40,6 +40,7 @@ Briefly summarize the most important details and events that occured in that seq
 	"memory_max_tokens": 0, // max generated length for memories. 0 = default setting used
 	"rate_limit": 0, // requests per minute. 0 means no limit
 	"profile": null, // optional connection-profile override
+	"preset": null, // optional API settings preset override
 	"use_quiet_preset_generation": false, // route background generation through ST's preset-aware quiet prompt pipeline
 	// WI settings
 	"memory_depth": 4, // depth
@@ -120,6 +121,57 @@ function reloadProfiles() {
 	}
 }
 
+function getPresetManager() {
+	const context = getContext();
+	if (typeof context.getPresetManager !== 'function') {
+		return null;
+	}
+	return context.getPresetManager();
+}
+
+function getPresetNames() {
+	const presetManager = getPresetManager();
+	if (!presetManager || typeof presetManager.getPresetList !== 'function') {
+		return [];
+	}
+	const { preset_names } = presetManager.getPresetList();
+	if (Array.isArray(preset_names)) {
+		return preset_names;
+	}
+	if (preset_names && typeof preset_names === 'object') {
+		return Object.keys(preset_names);
+	}
+	return [];
+}
+
+function reloadPresets() {
+	const presetSelect = $('#rmr_preset');
+	if (!presetSelect.length) return;
+
+	const existingValue = presetSelect.val() || settings.preset || '';
+	presetSelect.find('option').not(':first').remove();
+
+	for (const preset of getPresetNames()) {
+		presetSelect.append(
+			$('<option></option>')
+				.attr('value', preset)
+				.text(preset)
+		);
+	}
+
+	const hasExistingValue = existingValue && presetSelect.find('option').filter((_index, option) => option.value === existingValue).length;
+	if (hasExistingValue) {
+		presetSelect.val(existingValue);
+	}
+	else {
+		presetSelect.val('');
+		if (settings.preset && !getPresetNames().includes(settings.preset)) {
+			settings.preset = null;
+			getContext().saveSettingsDebounced();
+		}
+	}
+}
+
 async function loadSettingsUI() {
 	// add settings UI
 	const settingsDiv = await $.get(`${extension_path}/templates/settings_panel.html`);
@@ -191,12 +243,13 @@ async function loadSettingsUI() {
 	// 	toastr.warning('Memory fading is not yet implemented.', 'ReMemory');
 	// 	e.target.checked = false;
 	// });
-	$("#rmr_allow_names").prop('checked', settings.rmr_allow_names).on('click', toggleCheckboxSetting);
+	$("#rmr_allow_names").prop('checked', settings.allow_names).on('click', toggleCheckboxSetting);
 	$("#rmr_hide_scene").prop('checked', settings.hide_scene).on('click', toggleCheckboxSetting);
 	// $("#rmr_add_banner").prop('checked', settings.add_banner).on('click', toggleCheckboxSetting);
 	$("#rmr_add_chunk_summaries").prop('checked', settings.add_chunk_summaries).on('click', toggleCheckboxSetting);
 	// handle dropdowns
 	reloadProfiles();
+	reloadPresets();
 	$('#rmr_profile').on('input', () => {
 		const profile = $('#rmr_profile').val();
 		if (!profile.length) {
@@ -217,6 +270,13 @@ async function loadSettingsUI() {
 			getContext().saveSettingsDebounced();
 		}
 	});
+	$('#rmr_preset').on('input', () => {
+		const preset = $('#rmr_preset').val();
+		settings.preset = preset.length ? preset : null;
+		getContext().saveSettingsDebounced();
+	});
+	getContext().eventSource.on(getContext().event_types.PRESET_CHANGED, reloadPresets);
+	getContext().eventSource.on(getContext().event_types.CONNECTION_PROFILE_LOADED, reloadPresets);
 	
 	// load all numeric settings
 	$(`.rmr-extension_block input[type="number"]`).each((_i, elem) => {
