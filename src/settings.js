@@ -40,6 +40,7 @@ Briefly summarize the most important details and events that occured in that seq
 	"memory_max_tokens": 0, // max generated length for memories. 0 = default setting used
 	"rate_limit": 0, // requests per minute. 0 means no limit
 	"profile": null, // optional connection-profile override
+	"use_quiet_preset_generation": false, // route background generation through ST's preset-aware quiet prompt pipeline
 	// WI settings
 	"memory_depth": 4, // depth
 	"memory_life": 3,	// sticky
@@ -185,6 +186,7 @@ async function loadSettingsUI() {
 	// handle other checkboxes
 	$("#rmr_popup_memories").prop('checked', settings.popup_memories).on('click', toggleCheckboxSetting);
 	$("#rmr_fade_memories").prop('checked', settings.fade_memories).on('click', toggleCheckboxSetting);
+	$("#rmr_use_quiet_preset_generation").prop('checked', settings.use_quiet_preset_generation).on('click', toggleCheckboxSetting);
 	// $("#rmr_fade_memories").prop('checked', settings.fade_memories).on('click', (e) => {
 	// 	toastr.warning('Memory fading is not yet implemented.', 'ReMemory');
 	// 	e.target.checked = false;

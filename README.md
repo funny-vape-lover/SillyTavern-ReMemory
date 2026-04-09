@@ -79,6 +79,7 @@ Configure which buttons you want visible on your messages.
 ![image](https://github.com/user-attachments/assets/4495c680-a350-4abc-8e62-f6cbd68e6909)
 
 - **Profile override** - Select a connection profile to be used when generating memories and keywords. Uses your current API settings by default.
+- **Use preset-aware quiet generation** - Sends ReMemory generations through SillyTavern's normal quiet prompt pipeline instead of raw generation. Enable this if your jailbreak, prompt manager setup, or API preset needs to apply to memory generation.
 - **Rate Limiting** - Configure a maximum number of requests the extension can make **per minute**, to avoid API throttling. Requests are evenly spaced based on this value. Set to 0 (default) for no rate limiting.
 - **Summary prompt** - The summary prompt is appended to the end of a chunk of messages or summaries when creating a summary. It's used by Generate Memory and by both stages of scene summaries.
 - **Keyword prompt** - The keyword prompt is used when generating a list of comma-separated keywords to trigger the memory entry. The generation is given an additional stop string of a newline to ensure that the content is only one line.

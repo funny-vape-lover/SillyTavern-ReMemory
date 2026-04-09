@@ -215,6 +215,7 @@ async function runSwappableGen(prompt, stops=[]) {
 	const context = getContext();
 	let result = '';
 	let swapped = false;
+	const shouldUsePresetAwareGeneration = settings.use_quiet_preset_generation || Boolean(settings.profile || commandArgs.profile);
 	try {
 		context.deactivateSendButtons();
 		if (settings.profile || commandArgs.profile) {
@@ -224,7 +225,16 @@ async function runSwappableGen(prompt, stops=[]) {
 		}
 
 		stops.forEach(addEphemeralStoppingString);
-		result = await context.generateRaw({prompt: prompt});
+		if (shouldUsePresetAwareGeneration && typeof context.generateQuietPrompt === 'function') {
+			debug('running preset-aware quiet generation');
+			result = await context.generateQuietPrompt(prompt, false, false);
+		}
+		else {
+			if (shouldUsePresetAwareGeneration) {
+				oopsToast('Preset-aware quiet generation is unavailable in this SillyTavern build; using raw generation.');
+			}
+			result = await context.generateRaw({prompt: prompt});
+		}
 	} catch (err) {
 		debug("Error generating text", err);
 		errorToast(err.message);
