@@ -5,6 +5,7 @@ import { createWorldInfoEntry } from "../../../../world-info.js";
 import { user_avatar } from "../../../../personas.js";
 import { addEphemeralStoppingString, flushEphemeralStoppingStrings } from "../../../../power-user.js";
 import { getCharaFilename } from "../../../../utils.js";
+import { promptManager } from "../../../../../scripts/openai.js";
 import { settings, SceneEndMode } from "./settings.js";
 import { toggleSceneHighlight } from "./messages.js";
 import { debug } from "./logging.js";
@@ -265,12 +266,80 @@ async function restorePreset(previous_name) {
 	await waitForPresetChange();
 }
 
+function getPromptSlotId() {
+	return commandArgs.prompt_slot ?? settings.prompt_slot ?? null;
+}
+
+async function swapPromptSlot(promptText) {
+	const slotId = getPromptSlotId();
+	if (!slotId) {
+		return null;
+	}
+	if (!promptManager?.serviceSettings?.prompts) {
+		oopsToast('Preset prompt slot override is unavailable in this SillyTavern build; using the quiet prompt path.');
+		return false;
+	}
+
+	const slot = promptManager.serviceSettings.prompts.find(prompt => prompt?.identifier === slotId);
+	if (!slot) {
+		oopsToast(`Preset prompt slot "${slotId}" was not found; using the quiet prompt path.`);
+		return false;
+	}
+
+	const promptOrder = promptManager.getPromptOrderForCharacter(promptManager.activeCharacter);
+	const promptOrderEntry = promptManager.getPromptOrderEntry(promptManager.activeCharacter, slotId);
+	const previous = {
+		identifier: slotId,
+		content: slot.content,
+		order_enabled: promptOrderEntry?.enabled ?? null,
+		added_order_entry: false,
+	};
+
+	if (promptOrderEntry) {
+		promptOrderEntry.enabled = true;
+	}
+	else if (Array.isArray(promptOrder)) {
+		promptOrder.push({ identifier: slotId, enabled: true });
+		previous.added_order_entry = true;
+	}
+
+	slot.content = promptText;
+	debug('swapping prompt slot', slotId);
+	return previous;
+}
+
+async function restorePromptSlot(previous) {
+	if (!previous || !promptManager?.serviceSettings?.prompts) {
+		return;
+	}
+
+	const slot = promptManager.serviceSettings.prompts.find(prompt => prompt?.identifier === previous.identifier);
+	if (slot) {
+		slot.content = previous.content;
+	}
+
+	const promptOrder = promptManager.getPromptOrderForCharacter(promptManager.activeCharacter);
+	if (previous.added_order_entry && Array.isArray(promptOrder)) {
+		const index = promptOrder.findIndex(entry => entry.identifier === previous.identifier);
+		if (index >= 0) {
+			promptOrder.splice(index, 1);
+		}
+		return;
+	}
+
+	const promptOrderEntry = promptManager.getPromptOrderEntry(promptManager.activeCharacter, previous.identifier);
+	if (promptOrderEntry && previous.order_enabled !== null) {
+		promptOrderEntry.enabled = previous.order_enabled;
+	}
+}
+
 async function runSwappableGen(prompt, stops=[]) {
 	const context = getContext();
 	let result = '';
 	let swapped = false;
 	let swapped_preset = false;
-	const shouldUsePresetAwareGeneration = settings.use_quiet_preset_generation || Boolean(settings.profile || commandArgs.profile || settings.preset || commandArgs.preset);
+	let swapped_prompt_slot = null;
+	const shouldUsePresetAwareGeneration = settings.use_quiet_preset_generation || Boolean(settings.profile || commandArgs.profile || settings.preset || commandArgs.preset || settings.prompt_slot || commandArgs.prompt_slot);
 	try {
 		context.deactivateSendButtons();
 		if (settings.profile || commandArgs.profile) {
@@ -282,11 +351,15 @@ async function runSwappableGen(prompt, stops=[]) {
 			swapped_preset = await swapPreset();
 			debug('swapped preset?', swapped_preset);
 		}
+		if (settings.prompt_slot || commandArgs.prompt_slot) {
+			swapped_prompt_slot = await swapPromptSlot(prompt);
+			debug('swapped prompt slot?', swapped_prompt_slot);
+		}
 
 		stops.forEach(addEphemeralStoppingString);
 		if (shouldUsePresetAwareGeneration && typeof context.generateQuietPrompt === 'function') {
 			debug('running preset-aware quiet generation');
-			result = await context.generateQuietPrompt({ quietPrompt: prompt });
+			result = await context.generateQuietPrompt({ quietPrompt: swapped_prompt_slot ? '' : prompt });
 		}
 		else {
 			if (shouldUsePresetAwareGeneration) {
@@ -299,6 +372,9 @@ async function runSwappableGen(prompt, stops=[]) {
 		errorToast(err.message);
 	} finally {
 		flushEphemeralStoppingStrings();
+		if (swapped_prompt_slot) {
+			await restorePromptSlot(swapped_prompt_slot);
+		}
 		if (swapped_preset) {
 			await restorePreset(swapped_preset);
 		}

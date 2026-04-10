@@ -1,5 +1,6 @@
 import { extension_settings, getContext } from "../../../../extensions.js";
 import { extension_prompt_roles } from "../../../../../script.js";
+import { promptManager } from "../../../../../scripts/openai.js";
 import { getCharaFilename } from "../../../../utils.js";
 import { world_info } from "../../../../world-info.js";
 import { extension_name, extension_path } from '../index.js';
@@ -41,6 +42,7 @@ Briefly summarize the most important details and events that occured in that seq
 	"rate_limit": 0, // requests per minute. 0 means no limit
 	"profile": null, // optional connection-profile override
 	"preset": null, // optional API settings preset override
+	"prompt_slot": null, // optional chat-completion prompt slot override
 	"use_quiet_preset_generation": false, // route background generation through ST's preset-aware quiet prompt pipeline
 	// WI settings
 	"memory_depth": 4, // depth
@@ -172,6 +174,46 @@ function reloadPresets() {
 	}
 }
 
+function getPromptSlotOptions() {
+	if (!promptManager?.serviceSettings?.prompts) {
+		return [];
+	}
+	return promptManager.serviceSettings.prompts
+		.filter(prompt => prompt?.identifier)
+		.map(prompt => ({
+			value: prompt.identifier,
+			label: prompt.name?.length ? `${prompt.name} (${prompt.identifier})` : prompt.identifier,
+		}));
+}
+
+function reloadPromptSlots() {
+	const slotSelect = $('#rmr_prompt_slot');
+	if (!slotSelect.length) return;
+
+	const existingValue = slotSelect.val() || settings.prompt_slot || '';
+	slotSelect.find('option').not(':first').remove();
+
+	for (const slot of getPromptSlotOptions()) {
+		slotSelect.append(
+			$('<option></option>')
+				.attr('value', slot.value)
+				.text(slot.label)
+		);
+	}
+
+	const hasExistingValue = existingValue && slotSelect.find('option').filter((_index, option) => option.value === existingValue).length;
+	if (hasExistingValue) {
+		slotSelect.val(existingValue);
+	}
+	else {
+		slotSelect.val('');
+		if (settings.prompt_slot && !getPromptSlotOptions().some(slot => slot.value === settings.prompt_slot)) {
+			settings.prompt_slot = null;
+			getContext().saveSettingsDebounced();
+		}
+	}
+}
+
 async function loadSettingsUI() {
 	// add settings UI
 	const settingsDiv = await $.get(`${extension_path}/templates/settings_panel.html`);
@@ -250,6 +292,7 @@ async function loadSettingsUI() {
 	// handle dropdowns
 	reloadProfiles();
 	reloadPresets();
+	reloadPromptSlots();
 	$('#rmr_profile').on('input', () => {
 		const profile = $('#rmr_profile').val();
 		if (!profile.length) {
@@ -275,8 +318,15 @@ async function loadSettingsUI() {
 		settings.preset = preset.length ? preset : null;
 		getContext().saveSettingsDebounced();
 	});
+	$('#rmr_prompt_slot').on('input', () => {
+		const slot = $('#rmr_prompt_slot').val();
+		settings.prompt_slot = slot.length ? slot : null;
+		getContext().saveSettingsDebounced();
+	});
 	getContext().eventSource.on(getContext().event_types.PRESET_CHANGED, reloadPresets);
 	getContext().eventSource.on(getContext().event_types.CONNECTION_PROFILE_LOADED, reloadPresets);
+	getContext().eventSource.on(getContext().event_types.PRESET_CHANGED, reloadPromptSlots);
+	getContext().eventSource.on(getContext().event_types.CONNECTION_PROFILE_LOADED, reloadPromptSlots);
 	
 	// load all numeric settings
 	$(`.rmr-extension_block input[type="number"]`).each((_i, elem) => {

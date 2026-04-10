@@ -87,6 +87,12 @@
 						<option value="">-- Current Preset --</option>
 					</select>
 				</div>
+				<div title="Instead of sending the ReMemory instruction as SillyTavern's special quiet prompt, temporarily write it into this existing preset prompt slot during generation. Use this when your jailbreak only works if the instruction appears inside the preset order.">
+					Preset prompt slot override
+					<select class="text_pole widthNatural" id="rmr_prompt_slot">
+						<option value="">-- Use Quiet Prompt --</option>
+					</select>
+				</div>
 				<div title="Use SillyTavern's normal quiet-generation pipeline so the active connection profile and prompt/preset setup can apply to memory generation too.">
 					<label class="checkbox_label" for="rmr_use_quiet_preset_generation">
 						<input id="rmr_use_quiet_preset_generation" class="checkbox" type="checkbox" />

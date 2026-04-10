@@ -1,6 +1,7 @@
 import { extension_settings, getContext } from "../../../../extensions.js";
 import { commonEnumProviders } from '../../../../slash-commands/SlashCommandCommonEnumsProvider.js';
 import { enumTypes, SlashCommandEnumValue } from "../../../../slash-commands/SlashCommandEnumValue.js";
+import { promptManager } from "../../../../../scripts/openai.js";
 import { getActiveMemoryBooks, endScene, logMessage, rememberEvent, fadeMemories } from "./memories.js";
 import { debug } from "./logging.js";
 
@@ -20,6 +21,18 @@ const presetsProvider = () => {
 	return [
 		new SlashCommandEnumValue('<None>'),
 		...names.map(name => new SlashCommandEnumValue(name, null, enumTypes.name)),
+	];
+};
+
+const promptSlotsProvider = () => {
+	if (!promptManager?.serviceSettings?.prompts) {
+		return [new SlashCommandEnumValue('<Quiet Prompt>')];
+	}
+	return [
+		new SlashCommandEnumValue('<Quiet Prompt>'),
+		...promptManager.serviceSettings.prompts
+			.filter(prompt => prompt?.identifier)
+			.map(prompt => new SlashCommandEnumValue(prompt.identifier, prompt.name || prompt.identifier, enumTypes.name)),
 	];
 };
 
@@ -98,6 +111,12 @@ export function loadSlashCommands() {
 				name: 'preset',
 				description: 'name of an API settings preset to override the current one',
 				enumProvider: presetsProvider,
+				isRequired: false,
+			}),
+			namedArg.fromProps({
+				name: 'prompt_slot',
+				description: 'preset prompt slot to temporarily replace instead of using the quiet prompt',
+				enumProvider: promptSlotsProvider,
 				isRequired: false,
 			}),
 		],
@@ -190,6 +209,12 @@ export function loadSlashCommands() {
 				name: 'preset',
 				description: 'name of an API settings preset to override the current one',
 				enumProvider: presetsProvider,
+				isRequired: false,
+			}),
+			namedArg.fromProps({
+				name: 'prompt_slot',
+				description: 'preset prompt slot to temporarily replace instead of using the quiet prompt',
+				enumProvider: promptSlotsProvider,
 				isRequired: false,
 			}),
 		],
