@@ -108,6 +108,12 @@ export function loadSlashCommands() {
 				isRequired: false,
 			}),
 			namedArg.fromProps({
+				name: 'prompt_timestamps',
+				description: 'override whether source timestamps are included in the summarization prompt',
+				typeList: [arg_types.BOOLEAN],
+				isRequired: false,
+			}),
+			namedArg.fromProps({
 				name: 'profile',
 				description: 'name of a connection profile to override the current one',
 				enumProvider: profilesProvider,
@@ -214,6 +220,12 @@ export function loadSlashCommands() {
 			namedArg.fromProps({
 				name: 'timestamps',
 				description: 'override whether source timestamps are appended to scene memory entries',
+				typeList: [arg_types.BOOLEAN],
+				isRequired: false,
+			}),
+			namedArg.fromProps({
+				name: 'prompt_timestamps',
+				description: 'override whether source timestamps are included in the scene summarization prompt',
 				typeList: [arg_types.BOOLEAN],
 				isRequired: false,
 			}),

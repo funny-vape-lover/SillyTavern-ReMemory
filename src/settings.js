@@ -38,6 +38,7 @@ In your next response I want you to provide only a comma-delimited list of keywo
 Briefly summarize the most important details and events that occured in that sequence of events. Write your summary in a single paragraph.`,
 	"memory_prefix": "",
 	"memory_suffix": "",
+	"include_timestamps_in_prompt": false, // include message timestamps in summary prompts
 	"append_timestamps": false, // append source message time/range to saved memories
 	"memory_max_tokens": 0, // max generated length for memories. 0 = default setting used
 	"rate_limit": 0, // requests per minute. 0 means no limit
@@ -282,6 +283,7 @@ async function loadSettingsUI() {
 	$("#rmr_popup_memories").prop('checked', settings.popup_memories).on('click', toggleCheckboxSetting);
 	$("#rmr_fade_memories").prop('checked', settings.fade_memories).on('click', toggleCheckboxSetting);
 	$("#rmr_use_quiet_preset_generation").prop('checked', settings.use_quiet_preset_generation).on('click', toggleCheckboxSetting);
+	$("#rmr_include_timestamps_in_prompt").prop('checked', settings.include_timestamps_in_prompt).on('click', toggleCheckboxSetting);
 	$("#rmr_append_timestamps").prop('checked', settings.append_timestamps).on('click', toggleCheckboxSetting);
 	// $("#rmr_fade_memories").prop('checked', settings.fade_memories).on('click', (e) => {
 	// 	toastr.warning('Memory fading is not yet implemented.', 'ReMemory');

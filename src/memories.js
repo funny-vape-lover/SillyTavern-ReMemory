@@ -216,6 +216,16 @@ function appendSourceTimestamp(content, timestampLabel, options={}) {
 	return `${content}\n\n[Source time: ${timestampLabel}]`;
 }
 
+function shouldIncludeTimestampsInPrompt() {
+	return JSON.parse(commandArgs.prompt_timestamps ?? settings.include_timestamps_in_prompt);
+}
+
+function formatMessageForSummary(message) {
+	const timestamp = shouldIncludeTimestampsInPrompt() ? formatMessageTimestamp(message) : "";
+	const prefix = timestamp ? `[${timestamp}] ` : "";
+	return `${prefix}${message.name}: ${message.mes}`;
+}
+
 async function swapProfile() {
 	let swapped = false;
 	const current = extension_settings.connectionManager.selectedProfile;
@@ -437,7 +447,7 @@ async function generateMemory(message, span=0) {
 
 	const memory_history = await processMessageSlice(mes_id, memory_span);
 	debug('memory history', memory_history);
-	const memory_context = memory_history.map((it) => `${it.name}: ${it.mes}`).join("\n\n");
+	const memory_context = memory_history.map(formatMessageForSummary).join("\n\n");
 	return {
 		text: await genSummary(memory_context),
 		timestamp: getMessageTimestampLabel(memory_history),
@@ -478,7 +488,7 @@ async function generateSceneSummary(mes_id) {
 	let chunks = [];
 	let current = "";
 	for (const mes of memory_history) {
-		const mes_text = `${mes.name}: ${mes.mes}`;
+		const mes_text = formatMessageForSummary(mes);
 		const next_text = current+"\n\n"+mes_text;
 		const tokens = await getTokenCount(current+mes_text);
 		if (tokens > max_tokens) {
