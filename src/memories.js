@@ -226,9 +226,17 @@ function formatMessageForSummary(message) {
 	return `${prefix}${message.name}: ${message.mes}`;
 }
 
-function scopeChatToContextEnd() {
+function getContextEndId() {
 	const contextEnd = Number(commandArgs.__rmr_context_end);
 	if (!Number.isFinite(contextEnd)) {
+		return null;
+	}
+	return contextEnd;
+}
+
+function scopeChatToContextEnd() {
+	const contextEnd = getContextEndId();
+	if (contextEnd === null) {
 		return null;
 	}
 
@@ -249,6 +257,15 @@ function restoreScopedChat(removedMessages) {
 
 	getContext().chat.push(...removedMessages);
 	debug('restored scoped chat messages', removedMessages.length);
+}
+
+function prependSummaryScopeNote(history) {
+	const contextEnd = getContextEndId();
+	if (contextEnd === null) {
+		return history;
+	}
+
+	return `The following excerpt is the only chat history to summarize. It ends at message #${contextEnd}; ignore any later chat context if present.\n\n${history}`;
 }
 
 async function swapProfile() {
@@ -462,7 +479,7 @@ async function genSummary(history, id=0) {
 	if (id > 0) {
 		infoToast("Generating summary #"+id+"....");
 	}
-	const prompt_text = settings.memory_prompt_template.replace('{{content}}', history.trim());
+	const prompt_text = settings.memory_prompt_template.replace('{{content}}', prependSummaryScopeNote(history.trim()));
 	const result = await runSwappableGen(prompt_text);
 	const parsed_result = getContext().parseReasoningFromString(result);
 	if (!parsed_result) return result;

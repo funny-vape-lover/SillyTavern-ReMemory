@@ -44,14 +44,14 @@ export function addMessageButtons(message) {
 	if (settings.show_buttons.includes(Buttons.REMEMBER)) {
 		let newButton = $(genMemoryDiv);
 		newButton.on('click', (e) => {
-			rememberEvent(message);
+			rememberEvent($(e.target).closest('.mes'));
 		});
 		buttonbox.prepend(newButton);
 	}
 	if (settings.show_buttons.includes(Buttons.LOG)) {
 		let newButton = $(logMessageDiv);
 		newButton.on('click', (e) => {
-			logMessage(message);
+			logMessage($(e.target).closest('.mes'));
 		});
 		buttonbox.prepend(newButton);
 	}
