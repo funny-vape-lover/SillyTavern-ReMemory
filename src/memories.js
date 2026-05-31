@@ -226,6 +226,31 @@ function formatMessageForSummary(message) {
 	return `${prefix}${message.name}: ${message.mes}`;
 }
 
+function scopeChatToContextEnd() {
+	const contextEnd = Number(commandArgs.__rmr_context_end);
+	if (!Number.isFinite(contextEnd)) {
+		return null;
+	}
+
+	const chat = getContext().chat;
+	if (contextEnd < 0 || contextEnd >= chat.length - 1) {
+		return null;
+	}
+
+	const removed = chat.splice(contextEnd + 1);
+	debug('scoped chat context to message', contextEnd, 'removed messages', removed.length);
+	return removed;
+}
+
+function restoreScopedChat(removedMessages) {
+	if (!Array.isArray(removedMessages) || !removedMessages.length) {
+		return;
+	}
+
+	getContext().chat.push(...removedMessages);
+	debug('restored scoped chat messages', removedMessages.length);
+}
+
 async function swapProfile() {
 	let swapped = false;
 	const current = extension_settings.connectionManager.selectedProfile;
@@ -374,6 +399,7 @@ async function runSwappableGen(prompt, stops=[]) {
 	let swapped = false;
 	let swapped_preset = false;
 	let swapped_prompt_slot = null;
+	let scoped_chat = null;
 	const shouldUsePresetAwareGeneration = settings.use_quiet_preset_generation || Boolean(settings.profile || commandArgs.profile || settings.preset || commandArgs.preset || settings.prompt_slot || commandArgs.prompt_slot);
 	try {
 		context.deactivateSendButtons();
@@ -391,6 +417,7 @@ async function runSwappableGen(prompt, stops=[]) {
 			debug('swapped prompt slot?', swapped_prompt_slot);
 		}
 
+		scoped_chat = scopeChatToContextEnd();
 		stops.forEach(addEphemeralStoppingString);
 		if (shouldUsePresetAwareGeneration && typeof context.generateQuietPrompt === 'function') {
 			debug('running preset-aware quiet generation');
@@ -407,6 +434,7 @@ async function runSwappableGen(prompt, stops=[]) {
 		errorToast(err.message);
 	} finally {
 		flushEphemeralStoppingStrings();
+		restoreScopedChat(scoped_chat);
 		if (swapped_prompt_slot) {
 			await restorePromptSlot(swapped_prompt_slot);
 		}
@@ -443,6 +471,7 @@ async function genSummary(history, id=0) {
 
 async function generateMemory(message, span=0) {
 	const mes_id = Number(message.attr('mesid'));
+	commandArgs.__rmr_context_end = mes_id;
 	let memory_span = span > 0 ? span : settings.memory_span
 
 	const memory_history = await processMessageSlice(mes_id, memory_span);
@@ -589,6 +618,8 @@ export async function rememberEvent(message, options={}) {
 // logs the current message
 export async function logMessage(message, options={}) {
 	commandArgs = options;
+	const mes_id = Number(message.attr('mesid'));
+	commandArgs.__rmr_context_end = mes_id;
 	const membooks = await promptInfoBooks();
 	if (!membooks.length) {
 		oopsToast("No books selected");
@@ -602,7 +633,6 @@ export async function logMessage(message, options={}) {
 	let keywords;
 	if ('keywords' in options) keywords = options.keywords.split(',').map(it=>it.trim());
 	else keywords = await generateKeywords(message_text);
-	const mes_id = Number(message.attr('mesid'));
 	const timestamp = getMessageTimestampLabel([getContext().chat[mes_id]]);
 	const memory_text = `${settings.memory_prefix}${appendSourceTimestamp(message_text, timestamp, options)}${settings.memory_suffix}`;
 
@@ -617,6 +647,7 @@ export async function endScene(message, options={}) {
 	commandArgs = options;
 	const chat = getContext().chat;
 	let mes_id = Number(message.attr('mesid'));
+	commandArgs.__rmr_context_end = mes_id;
 	let mode = settings.scene_end_mode;
 	if ('mode' in options) {
 		let mode_in = options.mode.toUpperCase();
