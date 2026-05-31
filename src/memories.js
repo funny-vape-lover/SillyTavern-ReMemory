@@ -4,7 +4,7 @@ import { getRegexedString, regex_placement } from '../../../regex/engine.js';
 import { createWorldInfoEntry } from "../../../../world-info.js";
 import { user_avatar } from "../../../../personas.js";
 import { addEphemeralStoppingString, flushEphemeralStoppingStrings } from "../../../../power-user.js";
-import { getCharaFilename } from "../../../../utils.js";
+import { getCharaFilename, timestampToMoment } from "../../../../utils.js";
 import { promptManager } from "../../../../../scripts/openai.js";
 import { settings, SceneEndMode } from "./settings.js";
 import { toggleSceneHighlight } from "./messages.js";
@@ -189,6 +189,31 @@ async function processMessageSlice(mes_id, count=0, start=0) {
 		}
 	}
 	return message_history;
+}
+
+function formatMessageTimestamp(message) {
+	const timestamp = message?.send_date;
+	if (!timestamp) return "";
+	const momentDate = timestampToMoment(timestamp);
+	if (!momentDate?.isValid()) return "";
+	return momentDate.format('LL LT');
+}
+
+function getMessageTimestampLabel(messages) {
+	const timestamps = messages
+		.map(formatMessageTimestamp)
+		.filter(Boolean);
+	if (!timestamps.length) return "";
+
+	const start = timestamps[0];
+	const end = timestamps[timestamps.length - 1];
+	return start === end ? start : `${start} - ${end}`;
+}
+
+function appendSourceTimestamp(content, timestampLabel, options={}) {
+	const shouldAppend = JSON.parse(options.timestamps ?? settings.append_timestamps);
+	if (!shouldAppend || !timestampLabel) return content;
+	return `${content}\n\n[Source time: ${timestampLabel}]`;
 }
 
 async function swapProfile() {
@@ -413,7 +438,10 @@ async function generateMemory(message, span=0) {
 	const memory_history = await processMessageSlice(mes_id, memory_span);
 	debug('memory history', memory_history);
 	const memory_context = memory_history.map((it) => `${it.name}: ${it.mes}`).join("\n\n");
-	return await genSummary(memory_context);
+	return {
+		text: await genSummary(memory_context),
+		timestamp: getMessageTimestampLabel(memory_history),
+	};
 }
 
 async function generateKeywords(content) {
@@ -480,7 +508,7 @@ async function generateSceneSummary(mes_id) {
 					"ReMemory",
 					"There was an error generating a summary for chunk #"+Number(cid)+1,
 					{okButton: 'Retry', cancelButton: 'Cancel'});
-		    if (result != 1) return "";
+		    if (result != 1) return { text: "", timestamp: "" };
 			}
 		}
 		// now we have a summary for each chunk, we need to combine them
@@ -491,7 +519,7 @@ async function generateSceneSummary(mes_id) {
 	}
 	else {
 		oopsToast("No visible scene content! Skipping summary.");
-		return "";
+		return { text: "", timestamp: "" };
 	}
 	if (final_context.length > 0) {
 		infoToast("Generating scene summary....");
@@ -509,10 +537,13 @@ async function generateSceneSummary(mes_id) {
 			}
 			getContext().saveChat();
 		}
-		return result;
+		return {
+			text: result,
+			timestamp: getMessageTimestampLabel(memory_history),
+		};
 	} else {
 		oopsToast("No final content - skipping summary.");
-		return "";
+		return { text: "", timestamp: "" };
 	}
 
 }
@@ -526,9 +557,10 @@ export async function rememberEvent(message, options={}) {
 		return;
 	}
 	infoToast('Generating memory....');
-	let message_text;
-	if ('span' in options) message_text = await generateMemory(message, options.span);
-	else message_text = await generateMemory(message);
+	let memory;
+	if ('span' in options) memory = await generateMemory(message, options.span);
+	else memory = await generateMemory(message);
+	const message_text = memory.text;
 	if (message_text.length <= 0) {
 		errorToast("No memory text to record.");
 		return;
@@ -536,7 +568,7 @@ export async function rememberEvent(message, options={}) {
 	let keywords;
 	if ('keywords' in options) keywords = options.keywords.split(',').map(it=>it.trim());
 	else keywords = await generateKeywords(message_text);
-	const memory_text = `${settings.memory_prefix}${message_text}${settings.memory_suffix}`;
+	const memory_text = `${settings.memory_prefix}${appendSourceTimestamp(message_text, memory.timestamp, options)}${settings.memory_suffix}`;
 
 	for (const book of membooks) {
 		await createMemoryEntry(memory_text, book, keywords, options);
@@ -560,7 +592,9 @@ export async function logMessage(message, options={}) {
 	let keywords;
 	if ('keywords' in options) keywords = options.keywords.split(',').map(it=>it.trim());
 	else keywords = await generateKeywords(message_text);
-	const memory_text = `${settings.memory_prefix}${message_text}${settings.memory_suffix}`;
+	const mes_id = Number(message.attr('mesid'));
+	const timestamp = getMessageTimestampLabel([getContext().chat[mes_id]]);
+	const memory_text = `${settings.memory_prefix}${appendSourceTimestamp(message_text, timestamp, options)}${settings.memory_suffix}`;
 
 	for (const book of membooks) {
 		await createMemoryEntry(memory_text, book, keywords, options);
@@ -588,15 +622,15 @@ export async function endScene(message, options={}) {
 			}
 		}
 		const summary = await generateSceneSummary(mes_id);
-		if (summary.length === 0) {
+		if (summary.text.length === 0) {
 			errorToast("Scene summary returned empty!");
 			return;
 		}
 		if (mode === SceneEndMode.MEMORY) {
 			let keywords;
 			if ('keywords' in options) keywords = options.keywords.split(',').map(it=>it.trim());
-			else keywords = await generateKeywords(summary);
-			const memory_text = `${settings.memory_prefix}${summary}${settings.memory_suffix}`;
+			else keywords = await generateKeywords(summary.text);
+			const memory_text = `${settings.memory_prefix}${appendSourceTimestamp(summary.text, summary.timestamp, options)}${settings.memory_suffix}`;
 			
 			for (const book of membooks) {
 				await createMemoryEntry(memory_text, book, keywords, options);
@@ -605,7 +639,7 @@ export async function endScene(message, options={}) {
 		}
 		else if (mode === SceneEndMode.MESSAGE) {
 			mes_id += 1
-			await runSlashCommand(`/comment at=${mes_id} ${summary} || /chat-jump ${mes_id}`);
+			await runSlashCommand(`/comment at=${mes_id} ${summary.text} || /chat-jump ${mes_id}`);
 		}
 	}
 	if (settings.fade_memories) {

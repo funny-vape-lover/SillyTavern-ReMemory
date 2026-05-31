@@ -102,6 +102,12 @@ export function loadSlashCommands() {
 				isRequired: false,
 			}),
 			namedArg.fromProps({
+				name: 'timestamps',
+				description: 'override whether source timestamps are appended to the memory',
+				typeList: [arg_types.BOOLEAN],
+				isRequired: false,
+			}),
+			namedArg.fromProps({
 				name: 'profile',
 				description: 'name of a connection profile to override the current one',
 				enumProvider: profilesProvider,
@@ -152,6 +158,12 @@ export function loadSlashCommands() {
 				typeList: [arg_types.BOOLEAN],
 				isRequired: false,
 			}),
+			namedArg.fromProps({
+				name: 'timestamps',
+				description: 'override whether source timestamps are appended to the memory',
+				typeList: [arg_types.BOOLEAN],
+				isRequired: false,
+			}),
 		],
 		helpString: 'Logs the message at the given ID. Defaults to the most recent message if no ID is provided.',
 	}));
@@ -196,6 +208,12 @@ export function loadSlashCommands() {
 			namedArg.fromProps({
 				name: 'popup',
 				description: 'override the "popup memory" setting. only used when scene end mode is `memory`',
+				typeList: [arg_types.BOOLEAN],
+				isRequired: false,
+			}),
+			namedArg.fromProps({
+				name: 'timestamps',
+				description: 'override whether source timestamps are appended to scene memory entries',
 				typeList: [arg_types.BOOLEAN],
 				isRequired: false,
 			}),
